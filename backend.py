@@ -6,6 +6,7 @@ import os
 import shutil
 import time
 import atexit
+import loguru
 from concurrent.futures import ThreadPoolExecutor
 
 
@@ -18,6 +19,7 @@ app = Flask(
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['TEMP_DIR'] = os.path.join('instance', 'userdata', 'temp')
 app.secret_key = 'helloworldKey'
 
 # 任务队列
@@ -55,7 +57,7 @@ def register():
     
     # 检查用户名是否存在
     existing_user = User.query.filter_by(username=username).first()
-    if existing_user:
+    if existing_user or username=='temp':
         return jsonify({'message': '用户名已存在'}), 400
     
     # 创建新用户
@@ -66,6 +68,8 @@ def register():
 
     # 建立用户文件夹
     os.makedirs(os.path.join("instance",'userdata',username), exist_ok=True)
+
+    loguru.logger.info(f"/api/register : 用户 {username} 注册成功")
     
     return jsonify({'message': '用户注册成功'}), 201
 
@@ -166,6 +170,7 @@ def launch_status(task_id):
     
     status = task_status[task_id]
     
+
     return jsonify({
         'message': status['message'],
         'status': status['status'],
@@ -182,6 +187,8 @@ def install_server():
     # 安装服务器的逻辑
     shutil.copytree(os.path.join('instance', 'userdata', 'admin', 'game'), os.path.join('instance', 'userdata', session['username'], 'game'), dirs_exist_ok=True)
     
+    loguru.logger.info(f"/api/installserver : 用户 {session['username']} 安装服务器成功")
+
     return jsonify({'message': '服务器安装成功'}), 200
 
 
@@ -190,6 +197,8 @@ def install_server():
 # 存档目录为：instance/userdata/{username}/game/steam 文件夹
 @app.route('/api/downloadsaves', methods=['POST','GET'])
 def download_saves():
+
+    loguru.logger.info(f"/api/downloadsaves : 用户 {session['username']} 发起了下载存档请求。")
 
     try:
         if 'login' not in session or not session['login']:
@@ -202,15 +211,55 @@ def download_saves():
         zip_path = os.path.join('instance', 'userdata', username, 'saves.zip')
         if os.path.exists(zip_path):
             os.remove(zip_path)
-            
+
         shutil.make_archive(zip_path.replace('.zip', ''), 'zip', saves_path)
     
         # 返回压缩文件的路径
         return send_file(zip_path, as_attachment=True)
     
+    
+    
     except Exception as e:
         return jsonify({'message': f'下载存档失败: {str(e)}', 'success': False}), 500
     
+
+# 用于存档上传的 API
+# 上传的是 zip 文件，文件里有且仅有一个名为 steam 的文件夹
+# 上传的存档目录为：instance/userdata/{username}/game/steam 文件夹,直接覆盖
+@app.route('/api/uploadsaves', methods=['POST'])
+def upload_saves():
+
+    loguru.logger.info(f"/api/uploadsaves : 用户 {session['username']} 发起了上传存档请求。")
+
+    try:
+        if 'login' not in session or not session['login']:
+            return redirect(url_for('login_page'))
+        
+        username = session['username']
+        saves_path = os.path.join('instance', 'userdata', username, 'game', 'steam')
+        
+        # 创建存档目录
+        os.makedirs(saves_path, exist_ok=True)
+        
+        # 获取上传的文件 
+        file = request.files['zipFile']
+        
+        # 保存文件到临时目录
+        os.makedirs(os.path.join(app.config['TEMP_DIR'], username), exist_ok=True)
+
+        temp_zip_path = os.path.join(app.config['TEMP_DIR'], username,file.filename)
+        file.save(temp_zip_path)
+        
+        # 解压缩文件
+        shutil.unpack_archive(temp_zip_path, saves_path)
+        
+        # 删除临时文件
+        os.remove(temp_zip_path)
+        
+        return jsonify({'message': '存档上传成功'}), 200
+    
+    except Exception as e:
+        return jsonify({'message': f'存档上传失败: {str(e)}', 'success': False}), 500
 
 
 
