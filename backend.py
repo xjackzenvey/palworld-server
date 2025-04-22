@@ -1,5 +1,5 @@
 from werkzeug.security import generate_password_hash, check_password_hash
-from flask import Flask, request, jsonify,render_template, session, url_for, redirect
+from flask import Flask, request, jsonify,render_template, session, url_for, redirect, send_file
 from flask_sqlalchemy import SQLAlchemy
 import subprocess
 import os
@@ -186,6 +186,34 @@ def install_server():
 
 
 
+# 用于下载存档的 API
+# 存档目录为：instance/userdata/{username}/game/steam 文件夹
+@app.route('/api/downloadsaves', methods=['POST','GET'])
+def download_saves():
+
+    try:
+        if 'login' not in session or not session['login']:
+            return redirect(url_for('login_page'))
+        
+        username = session['username']
+        saves_path = os.path.join('instance', 'userdata', username, 'game', 'steam')
+        
+        # 压缩存档文件夹
+        zip_path = os.path.join('instance', 'userdata', username, 'saves.zip')
+        if os.path.exists(zip_path):
+            os.remove(zip_path)
+            
+        shutil.make_archive(zip_path.replace('.zip', ''), 'zip', saves_path)
+    
+        # 返回压缩文件的路径
+        return send_file(zip_path, as_attachment=True)
+    
+    except Exception as e:
+        return jsonify({'message': f'下载存档失败: {str(e)}', 'success': False}), 500
+    
+
+
+
 
 # 主页路由
 @app.route('/')
@@ -220,6 +248,9 @@ def saves_page():
         return redirect(url_for('login_page'))
     
     return render_template('saves.html')
+
+
+
 
 
 if __name__ == '__main__':

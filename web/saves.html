@@ -194,6 +194,7 @@
                             </div>
                         </div>
                         <div class="card-body">
+                            <p class="card-text">上传的存档文件包含 "steam" 文件夹。</p>
                             <div class="status-message bg-info text-white" id="status-message"></div>
                             
                             <!-- 上传存档表单 -->
@@ -273,7 +274,7 @@
                 showLoading('正在打包存档...');
                 
                 // 发送请求到后端下载存档
-                fetch('/download-archive', {
+                fetch('/api/downloadsaves', {
                     method: 'GET',
                 })
                 .then(response => {
