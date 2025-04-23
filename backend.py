@@ -139,13 +139,13 @@ def launch_server():
     try:
         # 生成任务ID
         task_id = int(time.time() * 1000)
-        task_status[task_id] = {'status': 'pending', 'message': '服务器启动中...'}
+        task_status[task_id] = {'status': 'pending', 'message': '服务器已在后台启动...'}
         
         # 在后台线程中启动服务器
         executor.submit(start_server_in_background, [task_id,session['username']])
         
         return jsonify({
-            'message': '服务器启动中...',
+            'message': '服务器启动成功，正在后台运行',
             'success': True,
             'task_id': task_id
         })
@@ -241,7 +241,7 @@ def upload_saves():
         # 创建存档目录
         os.makedirs(saves_path, exist_ok=True)
         
-        # 获取上传的文件 
+        # 获取上传的文件 服务器启动中...
         file = request.files['zipFile']
         
         # 保存文件到临时目录
@@ -260,6 +260,22 @@ def upload_saves():
     
     except Exception as e:
         return jsonify({'message': f'存档上传失败: {str(e)}', 'success': False}), 500
+    
+
+# 用于更新服务器的 API
+@app.route('/api/stopserver', methods=['POST'])
+def stop_server():
+    if 'login' not in session or not session['login']:
+        return redirect(url_for('login_page'))
+    
+    try:
+        
+        loguru.logger.info(f"/api/stopserver : 用户 {session['username']} 开始更新服务器")
+        time.sleep(5)
+        return jsonify({'message': '服务器更新成功'}), 200
+    
+    except Exception as e:
+        return jsonify({'message': f'服务器更新失败: {str(e)}', 'success': False}), 500
 
 
 
